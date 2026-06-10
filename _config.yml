@@ -1,4 +1,17 @@
-theme: minima
+# Site settings
 title: Random Thoughts
-description: Sharing my thoughts with myself
-author: Javier Jiménez
+email: 
+description: "My attempt of a personal blog"
+baseurl: ""
+url: "http://jajimer.github.io"
+github_username:  jajimer
+
+# Build settings
+markdown: kramdown
+permalink: pretty
+
+highlighter: rouge
+kramdown:
+  input: GFM
+  auto_ids: true
+  syntax_highlighter: rouge

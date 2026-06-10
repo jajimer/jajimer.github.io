@@ -1,2 +1,3 @@
 # jajimer.github.io
-Personal page
+
+Personal page, or something like that.
