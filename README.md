@@ -1,3 +1,10 @@
 # jajimer.github.io
 
-Personal page, or something like that.
+Personal page
+
+## Local rendering
+
+```
+bundle install
+bundle exec jekyll serve --drafts --livereload
+```
