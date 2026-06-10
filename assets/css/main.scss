@@ -1,0 +1,69 @@
+---
+---
+
+@import "minima";
+
+// ---- Code blocks: dark theme (Catppuccin Mocha) ----
+pre,
+pre.highlight {
+  background-color: #1e1e2e;
+  border-radius: 6px;
+}
+
+pre code { color: #cdd6f4; }
+
+.highlight {
+  background: #1e1e2e;
+  border-radius: 6px;
+
+  pre { margin: 0; }
+
+  .hll            { background-color: #313244; }
+  .c, .cm, .c1,
+  .cs             { color: #6c7086; font-style: italic; }
+  .err            { color: #f38ba8; }
+  .k, .kd, .kn,
+  .kp, .kr        { color: #cba6f7; }
+  .kt             { color: #89dceb; }
+  .o, .ow         { color: #89dceb; }
+  .n, .p          { color: #cdd6f4; }
+  .nb             { color: #89dceb; }
+  .nc             { color: #f9e2af; }
+  .nd             { color: #89dceb; }
+  .nf             { color: #89b4fa; }
+  .nn             { color: #f9e2af; }
+  .nt             { color: #f38ba8; }
+  .nv, .vi,
+  .vc, .vg        { color: #cba6f7; }
+  .m, .mf, .mh,
+  .mi, .mo, .il   { color: #fab387; }
+  .s, .sb, .sc, .sd, .s2, .se,
+  .sh, .si, .sx,
+  .sr, .s1, .ss   { color: #a6e3a1; }
+  .na             { color: #89b4fa; }
+  .no             { color: #fab387; }
+  .cp             { color: #6c7086; }
+}
+
+// ---- Post navigation ----
+.post-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid $grey-color-light;
+  font-size: 0.9rem;
+
+  a       { color: $grey-color; }
+  a:hover { color: $text-color; text-decoration: none; }
+}
+
+.post-nav-next { margin-left: auto; }
+
+// ---- Post tags ----
+.post-tag {
+  background: $grey-color-light;
+  border-radius: 3px;
+  padding: 0.1em 0.45em;
+  font-size: 0.8em;
+}
