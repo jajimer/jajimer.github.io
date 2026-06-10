@@ -1,0 +1,13 @@
+<footer class="site-footer">
+  <div class="wrapper">
+    <p class="footer-text">
+      &copy; {{ "now" | date: "%Y" }} {{ site.author | default: site.title }}
+      {%- if site.github_username -%}
+        &nbsp;&middot;&nbsp;<a href="https://github.com/{{ site.github_username }}">GitHub</a>
+      {%- endif -%}
+    </p>
+    <p class="footer-text">
+      {%- if site.description -%}{{ site.description }}{%- endif -%}
+    </p>
+  </div>
+</footer>

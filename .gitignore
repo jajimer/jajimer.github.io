@@ -1,2 +1,9 @@
 _drafts/
 _site/
+.bundle/
+vendor/
+.sass-cache/
+.jekyll-cache/
+*.gem
+Gemfile.lock
+.claude/

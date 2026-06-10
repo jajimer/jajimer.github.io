@@ -1,17 +1,22 @@
 # Site settings
 title: Random Thoughts
-email: 
-description: "My attempt of a personal blog"
+author: Javier Jiménez
+email: ""
+description: "Notes on engineering, ideas, and whatever else seems worth writing down."
 baseurl: ""
-url: "http://jajimer.github.io"
-github_username:  jajimer
+url: "https://jajimer.github.io"
+github_username: jajimer
 
 # Build settings
 markdown: kramdown
 permalink: pretty
-
 highlighter: rouge
 kramdown:
   input: GFM
   auto_ids: true
   syntax_highlighter: rouge
+
+# Plugins
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
