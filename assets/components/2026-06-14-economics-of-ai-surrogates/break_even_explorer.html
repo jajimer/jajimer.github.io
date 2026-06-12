@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Break-even explorer — AI surrogate vs PDE solver</title>
+<style>
+  :root {
+    --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e0;
+    --solver: #8a8a82; --surrogate: #5b4bc4; --bg: #ffffff; --panel: #f6f6f4;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: var(--ink); background: var(--bg); padding: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 20px; margin-bottom: 16px; }
+  .ctrl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+  .ctrl output { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--surrogate); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .metric { background: var(--panel); border-radius: 10px; padding: 10px 14px; }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metric .v small { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .metric.star { background: #efecfa; }
+  .metric.star .v { color: var(--surrogate); }
+  .legend { display: flex; gap: 18px; font-size: 12px; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 18px; height: 0; border-top: 3px solid; display: inline-block; }
+  .chartwrap { position: relative; width: 100%; height: 300px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="grid">
+  <div class="ctrl"><label><span>Simulation wall-clock t<sub>sim</sub></span> <output id="o_tsim">8 h</output></label>
+    <input type="range" id="tsim" min="0.5" max="48" step="0.5" value="8"></div>
+  <div class="ctrl"><label><span>CPU cores n<sub>cpu</sub></span> <output id="o_ncpu">64</output></label>
+    <input type="range" id="ncpu" min="8" max="512" step="8" value="64"></div>
+  <div class="ctrl"><label><span>CPU price p<sub>cpu</sub></span> <output id="o_pcpu">$0.04/core·h</output></label>
+    <input type="range" id="pcpu" min="0.01" max="0.10" step="0.01" value="0.04"></div>
+  <div class="ctrl"><label><span>Training simulations D</span> <output id="o_D">2,000</output></label>
+    <input type="range" id="D" min="100" max="10000" step="100" value="2000"></div>
+  <div class="ctrl"><label><span>Training GPU-hours</span> <output id="o_gpuh">384</output></label>
+    <input type="range" id="gpuh" min="24" max="2000" step="8" value="384"></div>
+  <div class="ctrl"><label><span>GPU price p<sub>gpu</sub></span> <output id="o_pgpu">$2.0/GPU·h</output></label>
+    <input type="range" id="pgpu" min="1" max="4" step="0.25" value="2"></div>
+  <div class="ctrl"><label><span>Inference time t<sub>inf</sub></span> <output id="o_tinf">2 s</output></label>
+    <input type="range" id="tinf" min="0.5" max="10" step="0.5" value="2"></div>
+</div>
+
+<div class="metrics">
+  <div class="metric"><div class="k">Cost per simulation c<sub>sim</sub></div><div class="v" id="m_csim">$20.5</div></div>
+  <div class="metric"><div class="k">Data generation C<sub>data</sub></div><div class="v" id="m_cdata">$41.0k</div></div>
+  <div class="metric"><div class="k">Training C<sub>train</sub></div><div class="v" id="m_ctrain">$768 <small id="m_simeq">≈ 37 sim-eq</small></div></div>
+  <div class="metric star"><div class="k">Break-even N*</div><div class="v" id="m_nstar">2,037 queries</div></div>
+</div>
+
+<div class="legend">
+  <span><span class="sw" style="border-color:#8a8a82"></span>Traditional solver</span>
+  <span><span class="sw" style="border-color:#5b4bc4; border-top-style: dashed"></span>AI surrogate</span>
+</div>
+<div class="chartwrap">
+  <canvas id="chart" role="img" aria-label="Cumulative cost versus number of queries for solver and surrogate; the crossing point is the break-even N star.">
+    Solver cost grows linearly with queries; the surrogate has a fixed upfront cost and a nearly flat line. The crossing point is the break-even query count.
+  </canvas>
+</div>
+<p class="note">Beyond N*, every additional query saves ≈ c<sub>sim</sub>. Savings shown at 5× the break-even volume: <strong id="m_save">$330k</strong>.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtMoney = v => v >= 1e6 ? '$' + (v/1e6).toFixed(2) + 'M'
+                  : v >= 1e3 ? '$' + (v/1e3).toFixed(1) + 'k'
+                  : '$' + v.toFixed(v < 10 ? 2 : 0);
+const fmtInt = v => Math.round(v).toLocaleString('en-US');
+
+const beLine = {
+  id: 'beLine',
+  afterDatasetsDraw(chart, args, opts) {
+    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+    if (opts.nstar == null) return;
+    const px = x.getPixelForValue(opts.nstar);
+    if (px < x.left || px > x.right) return;
+    ctx.save();
+    ctx.strokeStyle = '#b3a8e8'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(px, top); ctx.lineTo(px, bottom); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#5b4bc4'; ctx.font = '600 12px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('N* = ' + fmtInt(opts.nstar), px + 6, top + 14);
+    ctx.restore();
+  }
+};
+
+const chart = new Chart($('chart'), {
+  type: 'line',
+  data: { labels: [], datasets: [
+    { label: 'Solver', data: [], borderColor: '#8a8a82', borderWidth: 2.5, pointRadius: 0 },
+    { label: 'Surrogate', data: [], borderColor: '#5b4bc4', borderWidth: 2.5, pointRadius: 0, borderDash: [7, 5] }
+  ]},
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false }, beLine: { nstar: null },
+      tooltip: { callbacks: {
+        title: items => fmtInt(items[0].parsed.x) + ' queries',
+        label: ctx => ctx.dataset.label + ': ' + fmtMoney(ctx.parsed.y)
+      }}
+    },
+    scales: {
+      x: { type: 'linear', title: { display: true, text: 'Number of queries N' },
+           ticks: { maxTicksLimit: 8, callback: v => fmtInt(v) }, grid: { display: false } },
+      y: { title: { display: true, text: 'Cumulative cost' },
+           ticks: { callback: v => fmtMoney(v) }, grid: { color: '#efefec' } }
+    }
+  },
+  plugins: [beLine]
+});
+
+function update() {
+  const tsim = +$('tsim').value, ncpu = +$('ncpu').value, pcpu = +$('pcpu').value;
+  const D = +$('D').value, gpuh = +$('gpuh').value, pgpu = +$('pgpu').value, tinf = +$('tinf').value;
+
+  $('o_tsim').textContent = tsim + ' h';
+  $('o_ncpu').textContent = fmtInt(ncpu);
+  $('o_pcpu').textContent = '$' + pcpu.toFixed(2) + '/core·h';
+  $('o_D').textContent = fmtInt(D);
+  $('o_gpuh').textContent = fmtInt(gpuh);
+  $('o_pgpu').textContent = '$' + pgpu.toFixed(2) + '/GPU·h';
+  $('o_tinf').textContent = tinf + ' s';
+
+  const csim = tsim * ncpu * pcpu;
+  const cinf = (tinf / 3600) * pgpu;
+  const cdata = D * csim;
+  const ctrain = gpuh * pgpu;
+  const nstar = (cdata + ctrain) / (csim - cinf);
+
+  $('m_csim').textContent = fmtMoney(csim);
+  $('m_cdata').textContent = fmtMoney(cdata);
+  $('m_ctrain').innerHTML = fmtMoney(ctrain) + ' <small>≈ ' + fmtInt(ctrain / csim) + ' sim-eq</small>';
+  $('m_nstar').textContent = fmtInt(nstar) + ' queries';
+
+  const nmax = Math.ceil(nstar * 2.5 / 100) * 100;
+  const pts = 60, solver = [], surr = [];
+  for (let i = 0; i <= pts; i++) {
+    const n = Math.round(nmax * i / pts);
+    solver.push({ x: n, y: n * csim });
+    surr.push({ x: n, y: cdata + ctrain + n * cinf });
+  }
+  chart.data.datasets[0].data = solver;
+  chart.data.datasets[1].data = surr;
+  chart.options.plugins.beLine.nstar = nstar;
+  chart.update();
+
+  const n5 = 5 * nstar;
+  $('m_save').textContent = fmtMoney(n5 * csim - (cdata + ctrain + n5 * cinf));
+}
+
+['tsim','ncpu','pcpu','D','gpuh','pgpu','tinf'].forEach(id => $(id).addEventListener('input', update));
+update();
+</script>
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accuracy scaling explorer — ε(D) = ε₀ · D^−α</title>
+<style>
+  :root {
+    --ink: #1d1d1f; --muted: #6e6e73; --line: #e3e3e0;
+    --curve: #0f6e56; --target: #d85a30; --bg: #ffffff; --panel: #f6f6f4;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         color: var(--ink); background: var(--bg); padding: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px 20px; margin-bottom: 16px; }
+  .ctrl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+  .ctrl output { font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--curve); }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .metric { background: var(--panel); border-radius: 10px; padding: 10px 14px; }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metric.star { background: #e7f3ee; }
+  .metric.star .v { color: var(--curve); }
+  .legend { display: flex; gap: 18px; font-size: 12px; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; }
+  .legend > span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 18px; height: 0; border-top: 3px solid; display: inline-block; }
+  .chartwrap { position: relative; width: 100%; height: 300px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="grid">
+  <div class="ctrl"><label>Scaling exponent α <output id="o_alpha">0.30</output></label>
+    <input type="range" id="alpha" min="0.15" max="0.60" step="0.01" value="0.30"></div>
+  <div class="ctrl"><label>Error constant ε₀ (at D = 1) <output id="o_eps0">100%</output></label>
+    <input type="range" id="eps0" min="0.4" max="3" step="0.1" value="1"></div>
+  <div class="ctrl"><label><span>Target error ε<sub>t</sub></span> <output id="o_epst">5.0%</output></label>
+    <input type="range" id="epst" min="1" max="20" step="0.5" value="5"></div>
+  <div class="ctrl"><label>Training overhead (sim-equivalents) <output id="o_ovh">40</output></label>
+    <input type="range" id="ovh" min="0" max="500" step="10" value="40"></div>
+</div>
+
+<div class="metrics">
+  <div class="metric"><div class="k">Required dataset D<sub>min</sub> = (ε₀/ε<sub>t</sub>)<sup>1/α</sup></div><div class="v" id="m_dmin">21,544</div></div>
+  <div class="metric star"><div class="k">Break-even N* ≈ D<sub>min</sub> + overhead</div><div class="v" id="m_nstar">21,584</div></div>
+  <div class="metric"><div class="k">Cost of halving the error</div><div class="v" id="m_half">× 10.1</div></div>
+</div>
+
+<div class="legend">
+  <span><span class="sw" style="border-color:#0f6e56"></span>Scaling law ε(D) = ε₀ · D<sup>−α</sup></span>
+  <span><span class="sw" style="border-color:#d85a30; border-top-style: dashed"></span><span>Target error ε<sub>t</sub></span></span>
+</div>
+<div class="chartwrap">
+  <canvas id="chart" role="img" aria-label="Log-log plot of surrogate test error versus dataset size; a power law line crosses the dashed target error at the required dataset size.">
+    Test error falls as a power law in dataset size; the dataset where the curve crosses the target error is the required dataset size.
+  </canvas>
+</div>
+<p class="note">Both axes are logarithmic, so the power law is a straight line of slope −α. Because 1/α ≈ 2–5, halving the target error multiplies D<sub>min</sub> — and the break-even point — by 2<sup>1/α</sup>.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fmtInt = v => Math.round(v).toLocaleString('en-US');
+const fmtPct = v => (v * 100).toFixed(v < 0.02 ? 2 : 1) + '%';
+
+const markers = {
+  id: 'markers',
+  afterDatasetsDraw(chart, args, opts) {
+    const { ctx, chartArea: { top, bottom, left, right }, scales: { x, y } } = chart;
+    if (opts.epst == null) return;
+    ctx.save();
+    const py = y.getPixelForValue(opts.epst);
+    if (py >= top && py <= bottom) {
+      ctx.strokeStyle = '#d85a30'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(left, py); ctx.lineTo(right, py); ctx.stroke();
+    }
+    if (opts.dmin != null) {
+      const px = x.getPixelForValue(opts.dmin);
+      if (px >= left && px <= right) {
+        ctx.strokeStyle = '#9bbfb3'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, bottom); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#0f6e56'; ctx.beginPath(); ctx.arc(px, py, 4.5, 0, 2 * Math.PI); ctx.fill();
+        ctx.font = '600 12px sans-serif'; ctx.textAlign = px > (left + right) / 2 ? 'right' : 'left';
+        ctx.fillText('D min = ' + fmtInt(opts.dmin), px + (px > (left + right) / 2 ? -8 : 8), py - 8);
+      }
+    }
+    ctx.restore();
+  }
+};
+
+const chart = new Chart($('chart'), {
+  type: 'line',
+  data: { labels: [], datasets: [
+    { label: 'ε(D)', data: [], borderColor: '#0f6e56', borderWidth: 2.5, pointRadius: 0 }
+  ]},
+  options: {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+    plugins: {
+      legend: { display: false }, markers: { epst: null, dmin: null },
+      tooltip: { callbacks: {
+        title: items => 'D = ' + fmtInt(items[0].parsed.x) + ' simulations',
+        label: ctx => 'error ≈ ' + fmtPct(ctx.parsed.y)
+      }}
+    },
+    scales: {
+      x: { type: 'logarithmic', min: 10, max: 1e5,
+           title: { display: true, text: 'Dataset size D (simulations)' },
+           ticks: { callback: v => [10,100,1000,10000,100000].includes(v) ? fmtInt(v) : null },
+           grid: { color: '#efefec' } },
+      y: { type: 'logarithmic', min: 0.005, max: 1,
+           title: { display: true, text: 'Relative test error ε' },
+           ticks: { callback: v => [0.01,0.02,0.05,0.1,0.2,0.5,1].includes(v) ? fmtPct(v) : null },
+           grid: { color: '#efefec' } }
+    }
+  },
+  plugins: [markers]
+});
+
+function update() {
+  const alpha = +$('alpha').value, eps0 = +$('eps0').value;
+  const epst = +$('epst').value / 100, ovh = +$('ovh').value;
+
+  $('o_alpha').textContent = alpha.toFixed(2);
+  $('o_eps0').textContent = Math.round(eps0 * 100) + '%';
+  $('o_epst').textContent = (+$('epst').value).toFixed(1) + '%';
+  $('o_ovh').textContent = fmtInt(ovh);
+
+  const dmin = Math.pow(eps0 / epst, 1 / alpha);
+  $('m_dmin').textContent = dmin > 1e7 ? '> 10M' : fmtInt(dmin);
+  $('m_nstar').textContent = dmin > 1e7 ? '> 10M' : fmtInt(dmin + ovh);
+  $('m_half').textContent = '× ' + Math.pow(2, 1 / alpha).toFixed(1);
+
+  const data = [], pts = 80;
+  for (let i = 0; i <= pts; i++) {
+    const d = Math.pow(10, 1 + 4 * i / pts);
+    data.push({ x: d, y: Math.min(1, eps0 * Math.pow(d, -alpha)) });
+  }
+  chart.data.datasets[0].data = data;
+  chart.options.plugins.markers.epst = epst;
+  chart.options.plugins.markers.dmin = dmin;
+  chart.update();
+}
+
+['alpha','eps0','epst','ovh'].forEach(id => $(id).addEventListener('input', update));
+update();
+</script>
+</body>
+</html>
