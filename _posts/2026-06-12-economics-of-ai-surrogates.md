@@ -218,7 +218,7 @@ Enough theory, let's see how the above analysis materializes with realistic numb
 Adjust the solver cost, dataset size and training budget, and watch the break-even point $N^*$ move.
 
 <iframe
-    src="/assets/components/2026-06-14-economics-of-ai-surrogates/break_even_explorer.html" width="100%" height="640" style="border: none;" loading="lazy" title="Break-even explorer">
+    src="/assets/components/2026-06-12-economics-of-ai-surrogates/break_even_explorer.html" width="100%" height="640" style="border: none;" loading="lazy" title="Break-even explorer">
 </iframe>
 
 Defaults correspond to a representative external-aerodynamics CFD case: $ t_{\text{sim}} = 8 $ h on 64 cores at 0.04\\$ per core-h gives $c_{\text{sim}} \approx 20.5$\\$. A dataset of $D = 2{,}000$ runs costs $\approx 41{,}000$\\$; training for 384 GPU-hours at 2\\$ per GPU-h costs $\approx 768$\\$ — only **37 simulation-equivalents**. The break-even lands at $N^* \approx 2{,}040$ queries. A single shape-optimization run (genetic algorithms or Bayesian optimization over a parameterized geometry) routinely needs $10^3$–$10^5$ evaluations, so one serious study can recover the entire investment.
@@ -227,7 +227,7 @@ Defaults correspond to a representative external-aerodynamics CFD case: $ t_{\te
 
 Adjust the scaling exponent $\alpha$ and the target error $\varepsilon_t$ to see how the required dataset (and with it the break-even point) reacts.
 
-<iframe src="/assets/components/2026-06-14-economics-of-ai-surrogates/accuracy_scaling_explorer.html" width="100%" height="620" style="border: none;" loading="lazy" title="Accuracy scaling explorer"></iframe>
+<iframe src="/assets/components/2026-06-12-economics-of-ai-surrogates/accuracy_scaling_explorer.html" width="100%" height="620" style="border: none;" loading="lazy" title="Accuracy scaling explorer"></iframe>
 
 Notice the convexity: moving the target error from 5% to 2.5% looks like a modest ask, but at $\alpha = 0.3$ it multiplies the required dataset by $2^{1/0.3} \approx 10\times$. The exponent $\alpha$, which is a property of the problem and the architecture, is arguably the most economically consequential number in the whole pipeline.
 
